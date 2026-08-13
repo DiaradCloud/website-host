@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Cpu, Gauge, Globe, Lock, ShieldCheck, Zap } from "lucide-react";
+import { ArrowLeft, Gauge, Globe, Lock, ShieldCheck, Zap } from "lucide-react";
 import { SiteHeader } from "@/components/site/site-header";
 import { SiteFooter } from "@/components/site/site-footer";
+import { TerminalHero } from "@/components/site/terminal-hero";
 import { supabase } from "@/integrations/supabase/client";
 import { checkHost } from "@/lib/monitor.functions";
 import { faDate, faNumber, toman } from "@/lib/format";
@@ -108,20 +109,8 @@ function Landing() {
             </dl>
           </div>
 
-          {/* Image placeholder — replace src later */}
           <div className="order-first md:order-none">
-            <div
-              data-image-slot="hero"
-              className="surface flex aspect-[4/3] w-full items-center justify-center overflow-hidden p-0"
-            >
-              <div className="text-center">
-                <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl border border-border text-muted-foreground">
-                  <Cpu className="size-5" />
-                </div>
-                <p className="text-xs text-faint">جای تصویر (۱۲۰۰×۹۰۰)</p>
-                <p className="mt-1 text-[10px] text-faint">public/images/hero.jpg</p>
-              </div>
-            </div>
+            <TerminalHero latencyMs={host?.latencyMs} />
           </div>
         </section>
 
