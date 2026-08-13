@@ -60,10 +60,22 @@ function Overview() {
     },
   });
 
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["my-notifications", userId],
+    enabled: Boolean(userId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("notifications").select("id, title, body, level, link, read_at, created_at").or(`user_id.eq.${userId},user_id.is.null`).order("created_at", { ascending: false }).limit(5);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const active = services.filter((s) => s.status === "active");
 
   return (
     <div className="space-y-8">
+      {notifications.length > 0 && <section><h2 className="mb-3 text-sm font-semibold">اعلان‌ها</h2><div className="flex flex-col gap-2">{notifications.map((notification) => <div key={notification.id} className={`surface ${notification.read_at ? "opacity-70" : "border-primary/40"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold">{notification.title}</p><p className="mt-1 text-xs leading-6 text-muted-foreground">{notification.body}</p></div><span className="badge">{notification.level}</span></div></div>)}</div></section>}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="وضعیت دیانا ابر"
