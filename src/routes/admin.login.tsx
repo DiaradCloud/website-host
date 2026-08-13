@@ -1,54 +1,38 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BrandMark } from "@/components/brand/logo";
 import { supabase } from "@/integrations/supabase/client";
-import { useSession } from "@/hooks/use-session";
+import { hasStandaloneAdminSession, setStandaloneAdminSession } from "@/lib/admin-session";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "ورود مدیریت — دیاراد کلود" }, { name: "robots", content: "noindex" }] }),
   component: AdminLoginPage,
 });
 
-const ADMIN_EMAIL = "mehradtorvalds@proton.me";
-
 function AdminLoginPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { data: session, isLoading } = useSession();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && session?.isAdmin) void navigate({ to: "/admin", replace: true });
-  }, [isLoading, session?.isAdmin, navigate]);
+    if (hasStandaloneAdminSession()) void navigate({ to: "/admin", replace: true });
+  }, [navigate]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     const normalizedUsername = username.trim().toLowerCase();
-    const email = normalizedUsername === "mehrad" ? ADMIN_EMAIL : "";
-    const { error } = email
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : { error: new Error("invalid credentials") };
+    const { data, error } = normalizedUsername === "mehrad"
+      ? await supabase.rpc("authenticate_admin", { p_username: normalizedUsername, p_password: password })
+      : { data: null, error: new Error("invalid credentials") };
     setBusy(false);
-    if (error) {
+    if (error || !(data as { authenticated?: boolean } | null)?.authenticated) {
       toast.error("نام کاربری یا رمز عبور اشتباه است.");
       return;
     }
-    await queryClient.invalidateQueries({ queryKey: ["session"] });
-    const nextSession = await queryClient.fetchQuery({ queryKey: ["session"], queryFn: async () => {
-      const { loadSession } = await import("@/hooks/use-session");
-      return loadSession();
-    } });
-    if (!nextSession.isAdmin) {
-      await supabase.auth.signOut();
-      queryClient.clear();
-      toast.error("این حساب دسترسی مدیریت ندارد.");
-      return;
-    }
+    setStandaloneAdminSession(normalizedUsername);
     toast.success("ورود مدیریت انجام شد.");
     void navigate({ to: "/admin", replace: true });
   }

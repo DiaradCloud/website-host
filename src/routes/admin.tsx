@@ -1,10 +1,10 @@
 import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LayoutDashboard, LifeBuoy, LockKeyhole, Package, Server, Users } from "lucide-react";
 import { SiteHeader } from "@/components/site/site-header";
 import { SiteFooter } from "@/components/site/site-footer";
 import { PanelLayout } from "@/components/site/panel-shell";
-import { useSession } from "@/hooks/use-session";
+import { hasStandaloneAdminSession } from "@/lib/admin-session";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "مدیریت — دیاراد کلود" }, { name: "robots", content: "noindex" }] }),
@@ -21,11 +21,13 @@ const NAV = [
 ];
 
 function AdminLayout() {
-  const { data: session, isLoading } = useSession();
   const router = useRouter();
+  const [authorized, setAuthorized] = useState(false);
   useEffect(() => {
-    if (!isLoading && !session?.isAdmin) void router.navigate({ to: "/admin/login", replace: true });
-  }, [isLoading, session?.isStaff, router]);
+    const allowed = hasStandaloneAdminSession();
+    setAuthorized(allowed);
+    if (!allowed) void router.navigate({ to: "/admin/login", replace: true });
+  }, [router]);
 
-  return <div className="min-h-screen"><SiteHeader /><main className="pt-14">{isLoading ? <div className="shell py-16 text-sm text-muted-foreground">در حال بارگذاری…</div> : !session?.isStaff ? <div className="shell py-16"><p className="text-sm text-muted-foreground">دسترسی به این بخش مجاز نیست.</p><Link to="/dashboard" className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground">بازگشت به پنل</Link></div> : <PanelLayout title="کنسول مدیریت" subtitle="مدیریت کاربران، پشتیبانی، سرویس‌ها و قفل‌های فروش" nav={NAV}><Outlet /></PanelLayout>}</main><SiteFooter /></div>;
+  return <div className="min-h-screen"><SiteHeader /><main className="pt-14">{!authorized ? <div className="shell py-16 text-sm text-muted-foreground">در حال بررسی دسترسی…</div> : <PanelLayout title="کنسول مدیریت" subtitle="مدیریت کاربران، پشتیبانی، سرویس‌ها و قفل‌های فروش" nav={NAV}><Outlet /></PanelLayout>}</main><SiteFooter /></div>;
 }
