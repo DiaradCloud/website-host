@@ -10,7 +10,7 @@ export const Route = createFileRoute("/admin/login")({
   component: AdminLoginPage,
 });
 
-function AdminLoginPage() {
+export function AdminLoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

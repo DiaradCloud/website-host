@@ -22,12 +22,12 @@ const NAV = [
 
 function AdminLayout() {
   const router = useRouter();
-  const [authorized, setAuthorized] = useState(false);
+  const [authorized, setAuthorized] = useState(() => hasStandaloneAdminSession());
   useEffect(() => {
     const allowed = hasStandaloneAdminSession();
-    setAuthorized(allowed);
-    if (!allowed) void router.navigate({ to: "/admin/login", replace: true });
-  }, [router]);
+    if (allowed !== authorized) setAuthorized(allowed);
+    if (!allowed) void router.navigate({ to: "/admin/panel", replace: true });
+  }, [authorized, router]);
 
-  return <div className="min-h-screen"><SiteHeader /><main className="pt-14">{!authorized ? <div className="shell py-16 text-sm text-muted-foreground">در حال بررسی دسترسی…</div> : <PanelLayout title="کنسول مدیریت" subtitle="مدیریت کاربران، پشتیبانی، سرویس‌ها و قفل‌های فروش" nav={NAV}><Outlet /></PanelLayout>}</main><SiteFooter /></div>;
+  return <div className="min-h-screen"><SiteHeader /><main className="pt-14">{authorized ? <PanelLayout title="کنسول مدیریت" subtitle="مدیریت کاربران، پشتیبانی، سرویس‌ها و قفل‌های فروش" nav={NAV}><Outlet /></PanelLayout> : null}</main><SiteFooter /></div>;
 }
