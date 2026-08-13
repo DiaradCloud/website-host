@@ -23,6 +23,7 @@ import { Route as StatusRouteImport } from './routes/status'
 import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as DashboardInternetRouteImport } from './routes/dashboard.internet'
 import { Route as DashboardOrderRouteImport } from './routes/dashboard.order'
 import { Route as DashboardServicesRouteImport } from './routes/dashboard.services'
 
@@ -96,6 +97,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardInternetRoute = DashboardInternetRouteImport.update({
+  id: '/internet',
+  path: '/internet',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardOrderRoute = DashboardOrderRouteImport.update({
   id: '/order',
   path: '/order',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/internet': typeof DashboardInternetRoute
   '/dashboard/order': typeof DashboardOrderRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/blog/': typeof BlogIndexRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/internet': typeof DashboardInternetRoute
   '/dashboard/order': typeof DashboardOrderRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/blog': typeof BlogIndexRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/dashboard/internet': typeof DashboardInternetRoute
   '/dashboard/order': typeof DashboardOrderRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/blog/': typeof BlogIndexRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/status'
     | '/blog/$slug'
+    | '/dashboard/internet'
     | '/dashboard/order'
     | '/dashboard/services'
     | '/blog/'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/status'
     | '/blog/$slug'
+    | '/dashboard/internet'
     | '/dashboard/order'
     | '/dashboard/services'
     | '/blog'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/status'
     | '/blog/$slug'
+    | '/dashboard/internet'
     | '/dashboard/order'
     | '/dashboard/services'
     | '/blog/'
@@ -333,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/internet': {
+      id: '/dashboard/internet'
+      path: '/internet'
+      fullPath: '/dashboard/internet'
+      preLoaderRoute: typeof DashboardInternetRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/order': {
       id: '/dashboard/order'
       path: '/order'
@@ -351,12 +370,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
+  DashboardInternetRoute: typeof DashboardInternetRoute
   DashboardOrderRoute: typeof DashboardOrderRoute
   DashboardServicesRoute: typeof DashboardServicesRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardInternetRoute: DashboardInternetRoute,
   DashboardOrderRoute: DashboardOrderRoute,
   DashboardServicesRoute: DashboardServicesRoute,
   DashboardIndexRoute: DashboardIndexRoute,
