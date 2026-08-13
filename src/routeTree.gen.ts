@@ -23,6 +23,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminSecurityRouteImport } from './routes/admin.security'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminTicketsRouteImport } from './routes/admin.tickets'
@@ -106,6 +107,11 @@ const AdminCatalogRoute = AdminCatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSecurityRoute = AdminSecurityRouteImport.update({
   id: '/security',
   path: '/security',
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/login': typeof AdminLoginRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/services': typeof AdminServicesRoute
   '/admin/tickets': typeof AdminTicketsRoute
@@ -207,6 +214,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/login': typeof AdminLoginRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/services': typeof AdminServicesRoute
   '/admin/tickets': typeof AdminTicketsRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/login': typeof AdminLoginRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/services': typeof AdminServicesRoute
   '/admin/tickets': typeof AdminTicketsRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/status'
     | '/admin/catalog'
+    | '/admin/login'
     | '/admin/security'
     | '/admin/services'
     | '/admin/tickets'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/status'
     | '/admin/catalog'
+    | '/admin/login'
     | '/admin/security'
     | '/admin/services'
     | '/admin/tickets'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/status'
     | '/admin/catalog'
+    | '/admin/login'
     | '/admin/security'
     | '/admin/services'
     | '/admin/tickets'
@@ -452,6 +464,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCatalogRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/security': {
       id: '/admin/security'
       path: '/security'
@@ -541,6 +560,7 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminCatalogRoute: typeof AdminCatalogRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   AdminSecurityRoute: typeof AdminSecurityRoute
   AdminServicesRoute: typeof AdminServicesRoute
   AdminTicketsRoute: typeof AdminTicketsRoute
@@ -550,6 +570,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCatalogRoute: AdminCatalogRoute,
+  AdminLoginRoute: AdminLoginRoute,
   AdminSecurityRoute: AdminSecurityRoute,
   AdminServicesRoute: AdminServicesRoute,
   AdminTicketsRoute: AdminTicketsRoute,

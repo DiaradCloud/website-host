@@ -24,7 +24,7 @@ function AdminLayout() {
   const { data: session, isLoading } = useSession();
   const router = useRouter();
   useEffect(() => {
-    if (!isLoading && !session?.isStaff) void router.navigate({ to: "/dashboard", replace: true });
+    if (!isLoading && !session?.isAdmin) void router.navigate({ to: "/admin/login", replace: true });
   }, [isLoading, session?.isStaff, router]);
 
   return <div className="min-h-screen"><SiteHeader /><main className="pt-14">{isLoading ? <div className="shell py-16 text-sm text-muted-foreground">در حال بارگذاری…</div> : !session?.isStaff ? <div className="shell py-16"><p className="text-sm text-muted-foreground">دسترسی به این بخش مجاز نیست.</p><Link to="/dashboard" className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground">بازگشت به پنل</Link></div> : <PanelLayout title="کنسول مدیریت" subtitle="مدیریت کاربران، پشتیبانی، سرویس‌ها و قفل‌های فروش" nav={NAV}><Outlet /></PanelLayout>}</main><SiteFooter /></div>;
