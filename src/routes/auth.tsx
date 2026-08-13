@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BrandMark } from "@/components/brand/logo";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,6 +42,7 @@ function AuthPage() {
       toast.error("ایمیل یا رمز عبور اشتباه است.");
       return;
     }
+    await queryClient.invalidateQueries({ queryKey: ["session"] });
     toast.success("خوش آمدید");
     navigate({ to: "/dashboard", replace: true });
   }

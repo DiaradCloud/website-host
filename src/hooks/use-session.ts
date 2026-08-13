@@ -38,9 +38,15 @@ export async function loadSession(): Promise<SessionState> {
   ]);
 
   const roles = (roleRows ?? []).map((r) => r.role as string);
+  const profileData = (profile as (Profile & { account_locked?: boolean }) | null) ?? null;
+  if (profileData?.account_locked) {
+    await supabase.auth.signOut();
+    return { user: null, profile: null, roles: [], isStaff: false, isAdmin: false };
+  }
+
   return {
     user,
-    profile: (profile as Profile | null) ?? null,
+    profile: profileData,
     roles,
     isStaff: roles.includes("admin") || roles.includes("support"),
     isAdmin: roles.includes("admin"),
