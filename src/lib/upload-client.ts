@@ -24,18 +24,49 @@ export async function uploadImage(
         return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
       }
     }
-    const signed = await createUploadUrl({ data: { bucket, ext: ext as Ext } });
-    if (!signed.ok) return { ok: false, error: signed.error };
-    const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(signed.path, signed.token, file);
+    const { data: current } = await supabase.auth.getSession();
+    if (!current.session) return { ok: false, error: "ابتدا وارد حساب خود شوید." };
+
+    if (bucket === "blog") {
+      const signed = await createUploadUrl({ data: { bucket, ext: ext as Ext } });
+      if (!signed.ok) return { ok: false, error: signed.error };
+      const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(signed.path, signed.token, file);
+      if (error) return { ok: false, error: "آپلود فایل انجام نشد. دوباره تلاش کنید." };
+      return { ok: true, path: signed.path };
+    }
+
+    // Receipt uploads use Supabase Storage RLS directly. The bucket policy
+    // requires the first folder to equal the authenticated user's id.
+    let path = `${current.session.user.id}/${crypto.randomUUID()}.${ext}`;
+    let { error } = await supabase.storage.from(bucket).upload(path, file, {
+      contentType: file.type,
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+    // Retry once with a freshly refreshed token if auth rotated mid-upload.
+    if (error && /jwt|token|unauthorized|auth/i.test(`${error.message} ${error.name}`)) {
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.data.session) {
+        path = `${refreshed.data.session.user.id}/${crypto.randomUUID()}.${ext}`;
+        const retry = await supabase.storage.from(bucket).upload(path, file, {
+          contentType: file.type,
+          cacheControl: "3600",
+          upsert: false,
+        });
+        error = retry.error;
+      }
+    }
+
     if (error) {
-      console.error("[v0] Signed upload failed:", error.message, error.name);
+      console.error("[v0] Receipt storage upload failed:", error.message, error.name);
       if (isStaleSessionError(error)) {
         await clearStaleSession();
         return { ok: false, error: SESSION_EXPIRED_ERROR };
       }
-      return { ok: false, error: "آپلود فایل انجام نشد. دوباره تلاش کنید." };
+      return { ok: false, error: `آپلود رسید انجام نشد: ${error.message}` };
     }
-    return { ok: true, path: signed.path };
+    return { ok: true, path };
   } catch (error) {
     console.error("[v0] Upload request failed:", error);
     if (isStaleSessionError(error)) {
