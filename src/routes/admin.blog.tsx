@@ -12,6 +12,7 @@ const emptyDraft: Draft = { title: "", slug: "", tag: "عمومی", excerpt: "",
 function AdminBlog() {
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const { data = [], isLoading } = useQuery({ queryKey: ["admin-blog"], queryFn: async () => {
@@ -21,6 +22,9 @@ function AdminBlog() {
   } });
 
   function update(field: keyof Draft, value: string | boolean) { setDraft((current) => ({ ...current, [field]: value })); }
+  function markdownPreview(value: string) {
+    return value.split("\\n").map((line) => line.replace(/^###\\s+/, "").replace(/^##\\s+/, "").replace(/^#\\s+/, "").replace(/\\*\\*(.*?)\\*\\*/g, "$1").replace(/\\*(.*?)\\*/g, "$1").replace(/`(.*?)`/g, "$1")).join("\\n");
+  }
   async function createPost() {
     if (!draft.title.trim() || !draft.slug.trim() || !draft.body.trim()) { toast.error("عنوان، مسیر و متن مقاله الزامی است."); return; }
     setSaving(true);
@@ -39,7 +43,7 @@ function AdminBlog() {
       <label className="flex flex-col gap-1 text-xs"><span>مسیر انگلیسی</span><input value={draft.slug} onChange={(e) => update("slug", e.target.value)} dir="ltr" className="rounded-md border border-border bg-background px-3 py-2" /></label>
       <label className="flex flex-col gap-1 text-xs"><span>دسته‌بندی</span><input value={draft.tag} onChange={(e) => update("tag", e.target.value)} className="rounded-md border border-border bg-background px-3 py-2" /></label>
       <label className="flex flex-col gap-1 text-xs"><span>خلاصه</span><input value={draft.excerpt} onChange={(e) => update("excerpt", e.target.value)} className="rounded-md border border-border bg-background px-3 py-2" /></label>
-    </div><label className="mt-3 flex flex-col gap-1 text-xs"><span>متن مقاله</span><textarea value={draft.body} onChange={(e) => update("body", e.target.value)} rows={8} className="resize-y rounded-md border border-border bg-background px-3 py-2" /></label><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.published} onChange={(e) => update("published", e.target.checked)} /> انتشار فوری</label><div className="mt-4 flex gap-2"><button type="button" disabled={saving} onClick={() => void createPost()} className="cursor-pointer rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50">{saving ? "در حال ذخیره…" : "ذخیره مقاله"}</button><button type="button" onClick={() => setOpen(false)} className="cursor-pointer rounded-md border border-border px-4 py-2 text-xs">انصراف</button></div></div>}
+    </div><div className="mt-3 flex items-center justify-between gap-2"><span className="text-xs">متن مقاله با پشتیبانی Markdown</span><button type="button" onClick={() => setPreview((value) => !value)} className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-xs">{preview ? "ویرایش Markdown" : "پیش‌نمایش"}</button></div>{preview ? <div className="mt-2 min-h-48 whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-3 text-sm leading-7">{markdownPreview(draft.body) || "پیش‌نمایش مقاله اینجا نمایش داده می‌شود."}</div> : <textarea value={draft.body} onChange={(e) => update("body", e.target.value)} rows={8} dir="auto" placeholder="# عنوان\n\n**متن برجسته** و `کد`" className="mt-2 min-h-48 w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-sm leading-7" />}<label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.published} onChange={(e) => update("published", e.target.checked)} /> انتشار فوری</label><div className="mt-4 flex gap-2"><button type="button" disabled={saving} onClick={() => void createPost()} className="cursor-pointer rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50">{saving ? "در حال ذخیره…" : "ذخیره مقاله"}</button><button type="button" onClick={() => setOpen(false)} className="cursor-pointer rounded-md border border-border px-4 py-2 text-xs">انصراف</button></div></div>}
     <div className="mt-5 overflow-x-auto"><table className="w-full text-right text-xs"><thead className="text-muted-foreground"><tr><th className="pb-3">عنوان</th><th className="pb-3">دسته‌بندی</th><th className="pb-3">وضعیت</th><th className="pb-3">آخرین ویرایش</th></tr></thead><tbody>{isLoading ? <tr><td colSpan={4} className="py-5 text-muted-foreground">در حال بارگذاری…</td></tr> : data.map((post) => <tr key={post.id} className="border-t border-border"><td className="py-3 font-medium">{post.title}</td><td className="py-3 text-muted-foreground">{post.tag || "عمومی"}</td><td className="py-3">{post.published ? "منتشر شده" : "پیش‌نویس"}</td><td className="py-3 text-muted-foreground">{new Date(post.updated_at).toLocaleDateString("fa-IR")}</td></tr>)}</tbody></table></div>
   </section>;
 }
