@@ -29,10 +29,15 @@ export function AdminLoginPage() {
       p_password: password,
     });
     setBusy(false);
-    const result = typeof data === "string" ? JSON.parse(data) as { authenticated?: boolean } : data as { authenticated?: boolean } | null;
+    let result: { authenticated?: boolean } | null = null;
+    try {
+      result = typeof data === "string" ? JSON.parse(data) as { authenticated?: boolean } : data as { authenticated?: boolean } | null;
+    } catch {
+      result = null;
+    }
     if (error) {
-      console.error("[v0] Admin login RPC failed:", error.message);
-      toast.error("اتصال ورود مدیریت برقرار نشد. صفحه را تازه‌سازی کنید.");
+      console.error("[v0] Admin login RPC failed:", error.message, error.details);
+      toast.error("ورود مدیریت موقتاً در دسترس نیست. دوباره تلاش کنید.");
       return;
     }
     if (!result?.authenticated) {
