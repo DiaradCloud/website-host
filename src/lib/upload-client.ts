@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createUploadUrl } from "@/lib/uploads.functions";
+import { uploadReceiptToBlob } from "@/lib/blob-upload.functions";
 import { clearStaleSession, isStaleSessionError } from "@/lib/auth-recovery";
 
 const ALLOWED = ["jpg", "jpeg", "png", "webp", "gif"] as const;
@@ -17,12 +18,23 @@ export async function uploadImage(
   if (!ALLOWED.includes(ext as Ext)) return { ok: false, error: "فقط تصویر jpg/png/webp مجاز است." };
 
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session) {
-      const refreshed = await supabase.auth.refreshSession();
-      if (refreshed.error || !refreshed.data.session) {
-        return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
-      }
+    // Receipt uploads use the independent Blob endpoint and do not depend on
+    // the broken Supabase bearer-token bridge.
+    if (bucket === "ticket-attachments") {
+      const body = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadReceiptToBlob({ data: { filename: file.name, contentType: file.type, body } });
+      if (!result.ok) return result;
+      return { ok: true, path: result.url };
+    }
+
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error || !refreshed.data.session) {
+      return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
     }
     const { data: current } = await supabase.auth.getSession();
     if (!current.session) return { ok: false, error: "ابتدا وارد حساب خود شوید." };
@@ -35,8 +47,6 @@ export async function uploadImage(
       return { ok: true, path: signed.path };
     }
 
-    // The server action provisions the bucket when necessary and issues a
-    // signed upload URL. This avoids browser-side bucket/RLS mismatches.
     const signed = await createUploadUrl({ data: { bucket, ext: ext as Ext } });
     if (!signed.ok) return { ok: false, error: signed.error };
     const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(signed.path, signed.token, file);

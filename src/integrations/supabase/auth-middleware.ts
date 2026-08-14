@@ -89,20 +89,20 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
+    // Validate the bearer token against Supabase Auth directly. `getClaims`
+    // can reject otherwise valid sessions after JWT signing-key rotation;
+    // `getUser` uses the Auth service's current verification path.
+    const { data: userData, error } = await supabase.auth.getUser(token);
+    if (error || !userData?.user) {
+      console.error('[v0] Supabase token verification failed:', error?.message);
       throw new Error('Unauthorized: Invalid token');
-    }
-
-    if (!data.claims.sub) {
-      throw new Error('Unauthorized: No user ID found in token');
     }
 
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId: userData.user.id,
+        claims: { sub: userData.user.id, email: userData.user.email },
       },
     });
   },
