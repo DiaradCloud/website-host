@@ -94,7 +94,7 @@ function OrderPage() {
     setUploading(true);
     try {
       const result = await Promise.race([
-        uploadImage("attachments", file),
+        uploadImage("ticket-attachments", file),
         new Promise<{ ok: false; error: string }>((resolve) => setTimeout(() => resolve({ ok: false, error: "بارگذاری بیش از حد طول کشید. دوباره تلاش کنید." }), 30000)),
       ]);
       if (!result.ok) {

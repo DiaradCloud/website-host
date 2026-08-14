@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const uploadSchema = z.object({
-  bucket: z.enum(["attachments", "blog"]),
+  bucket: z.enum(["ticket-attachments", "blog"]),
   ext: z.enum(["jpg", "jpeg", "png", "webp", "gif"]),
 });
 
@@ -32,7 +32,7 @@ export const signedFileUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
-      .object({ bucket: z.enum(["attachments", "blog"]), path: z.string().min(3).max(300) })
+      .object({ bucket: z.enum(["ticket-attachments", "blog"]), path: z.string().min(3).max(300) })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
