@@ -1,19 +1,28 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
 import { replyTicket } from "@/lib/tickets.functions";
+import { clearStaleSession, isStaleSessionError } from "@/lib/auth-recovery";
 
 export const Route = createFileRoute("/dashboard/tickets")({ component: TicketsPage });
 
 function TicketsPage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+
+  async function recoverExpiredSession() {
+    await clearStaleSession();
+    queryClient.clear();
+    toast.error("نشست شما منقضی شده است. دوباره وارد حساب خود شوید.");
+    await router.navigate({ to: "/auth", replace: true });
+  }
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["my-tickets", session?.user?.id],
     enabled: Boolean(session?.user?.id),
@@ -29,11 +38,26 @@ function TicketsPage() {
     setBusy(true);
     const { data: ticket, error } = await supabase.from("tickets").insert({ user_id: session.user.id, subject: subject.trim(), department: "technical", priority: "normal" }).select("id").single();
     if (error || !ticket) {
-      console.error("[v0] Ticket creation failed:", error?.message, error?.details);
+      console.error("[v0] Ticket creation failed:", error?.message, error?.code, error?.details);
+      if (isStaleSessionError(error)) {
+        setBusy(false);
+        return void recoverExpiredSession();
+      }
       setBusy(false);
       return toast.error("ثبت تیکت انجام نشد. لطفاً دوباره تلاش کنید.");
     }
-    const reply = await replyTicket({ data: { ticketId: ticket.id, body: body.trim() } });
+    let reply: { ok: true } | { ok: false; error: string } | undefined;
+    try {
+      reply = await replyTicket({ data: { ticketId: ticket.id, body: body.trim() } });
+    } catch (replyError) {
+      console.error("[v0] Ticket first message request failed:", replyError);
+      if (isStaleSessionError(replyError)) {
+        setBusy(false);
+        return void recoverExpiredSession();
+      }
+      setBusy(false);
+      return toast.error("تیکت ساخته شد اما متن پیام ذخیره نشد. لطفاً از بخش تیکت‌ها دوباره ارسال کنید.");
+    }
     setBusy(false);
     if (!reply?.ok) {
       console.error("[v0] Ticket first message failed:", reply);

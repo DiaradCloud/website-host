@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
 import { placeOrder } from "@/lib/orders.functions";
 import { uploadImage } from "@/lib/upload-client";
+import { clearStaleSession, isStaleSessionError } from "@/lib/auth-recovery";
 import { faNumber, toman } from "@/lib/format";
 import { BANK_CARD, DAYS_PER_MONTH, DURATIONS, OS_OPTIONS } from "@/lib/constants";
 
@@ -21,6 +22,14 @@ function OrderPage() {
   const { renew } = Route.useSearch();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const router = useRouter();
+
+  async function recoverExpiredSession() {
+    await clearStaleSession();
+    queryClient.clear();
+    toast.error("نشست شما منقضی شده است. دوباره وارد حساب خود شوید.");
+    await router.navigate({ to: "/auth", replace: true });
+  }
 
   const [planId, setPlanId] = useState<string>("");
   const [months, setMonths] = useState(1);
@@ -98,6 +107,11 @@ function OrderPage() {
         new Promise<{ ok: false; error: string }>((resolve) => setTimeout(() => resolve({ ok: false, error: "بارگذاری بیش از حد طول کشید. دوباره تلاش کنید." }), 30000)),
       ]);
       if (!result.ok) {
+        if (isStaleSessionError(result.error)) {
+          setUploading(false);
+          void recoverExpiredSession();
+          return;
+        }
         setUploadError(result.error);
         toast.error(result.error);
         return;
@@ -129,21 +143,37 @@ function OrderPage() {
       return;
     }
     setBusy(true);
-    const result = await placeOrder({
-      data: {
-        planId: chosenPlan.id,
-        serviceId: renewService?.id,
-        kind: renewService ? "renew" : "new",
-        durationMonths: months,
-        os: renewService?.os ?? os,
-        addons: addonIds,
-        serviceName: name,
-        receiptPath,
-        note: note.trim() || undefined,
-      },
-    });
+    let result: Awaited<ReturnType<typeof placeOrder>>;
+    try {
+      result = await placeOrder({
+        data: {
+          planId: chosenPlan.id,
+          serviceId: renewService?.id,
+          kind: renewService ? "renew" : "new",
+          durationMonths: months,
+          os: renewService?.os ?? os,
+          addons: addonIds,
+          serviceName: name,
+          receiptPath,
+          note: note.trim() || undefined,
+        },
+      });
+    } catch (error) {
+      setBusy(false);
+      console.error("[v0] Order submission request failed:", error);
+      if (isStaleSessionError(error)) {
+        void recoverExpiredSession();
+        return;
+      }
+      toast.error("ثبت سفارش انجام نشد. دوباره تلاش کنید.");
+      return;
+    }
     setBusy(false);
     if (!result.ok) {
+      if (isStaleSessionError(result.error)) {
+        void recoverExpiredSession();
+        return;
+      }
       toast.error(result.error);
       return;
     }
