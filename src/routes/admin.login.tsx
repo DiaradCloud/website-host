@@ -24,11 +24,18 @@ export function AdminLoginPage() {
     event.preventDefault();
     setBusy(true);
     const normalizedUsername = username.trim().toLowerCase();
-    const { data, error } = normalizedUsername === "mehrad"
-      ? await supabase.rpc("authenticate_admin", { p_username: normalizedUsername, p_password: password })
-      : { data: null, error: new Error("invalid credentials") };
+    const { data, error } = await supabase.rpc("authenticate_admin", {
+      p_username: normalizedUsername,
+      p_password: password,
+    });
     setBusy(false);
-    if (error || !(data as { authenticated?: boolean } | null)?.authenticated) {
+    const result = typeof data === "string" ? JSON.parse(data) as { authenticated?: boolean } : data as { authenticated?: boolean } | null;
+    if (error) {
+      console.error("[v0] Admin login RPC failed:", error.message);
+      toast.error("اتصال ورود مدیریت برقرار نشد. صفحه را تازه‌سازی کنید.");
+      return;
+    }
+    if (!result?.authenticated) {
       toast.error("نام کاربری یا رمز عبور اشتباه است.");
       return;
     }
