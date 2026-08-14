@@ -1,5 +1,5 @@
-import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { LayoutDashboard, LifeBuoy, LockKeyhole, Package, Server, Users } from "lucide-react";
 import { SiteHeader } from "@/components/site/site-header";
 import { SiteFooter } from "@/components/site/site-footer";
@@ -21,13 +21,17 @@ const NAV = [
 ];
 
 function AdminLayout() {
-  const router = useRouter();
-  const [authorized, setAuthorized] = useState(() => hasStandaloneAdminSession());
-  useEffect(() => {
-    const allowed = hasStandaloneAdminSession();
-    if (allowed !== authorized) setAuthorized(allowed);
-    if (!allowed) void router.navigate({ to: "/admin/panel", replace: true });
-  }, [authorized, router]);
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isLoginRoute = pathname === "/admin/panel" || pathname === "/admin/login";
+  const authorized = hasStandaloneAdminSession();
 
-  return <div className="min-h-screen"><SiteHeader /><main className="pt-14">{authorized ? <PanelLayout title="کنسول مدیریت" subtitle="مدیریت کاربران، پشتیبانی، سرویس‌ها و قفل‌های فروش" nav={NAV}><Outlet /></PanelLayout> : null}</main><SiteFooter /></div>;
+  useEffect(() => {
+    if (!isLoginRoute && !authorized) void navigate({ to: "/admin/panel", replace: true });
+  }, [authorized, isLoginRoute, navigate]);
+
+  if (isLoginRoute) return <Outlet />;
+  if (!authorized) return <div className="min-h-screen" aria-busy="true" />;
+
+  return <div className="min-h-screen"><SiteHeader /><main className="pt-14"><PanelLayout title="کنسول مدیریت" subtitle="مدیریت کاربران، پشتیبانی، سرویس‌ها و قفل‌های فروش" nav={NAV}><Outlet /></PanelLayout></main><SiteFooter /></div>;
 }
