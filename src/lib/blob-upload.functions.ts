@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const input = z.object({
@@ -9,7 +8,6 @@ const input = z.object({
 });
 
 export const uploadReceiptToBlob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((value: unknown) => input.parse(value))
   .handler(async ({ data, context }) => {
     const { put } = await import("@vercel/blob");
@@ -20,7 +18,7 @@ export const uploadReceiptToBlob = createServerFn({ method: "POST" })
     }
 
     const safeName = data.filename.replace(/[^a-zA-Z0-9._-]/g, "-");
-    const blob = await put(`receipts/${context.userId}/${crypto.randomUUID()}-${safeName}`, bytes, {
+    const blob = await put(`receipts/${crypto.randomUUID()}-${safeName}`, bytes, {
       access: "public",
       contentType: data.contentType,
       addRandomSuffix: false,

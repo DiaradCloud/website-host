@@ -18,6 +18,20 @@ export async function uploadImage(
   if (!ALLOWED.includes(ext as Ext)) return { ok: false, error: "فقط تصویر jpg/png/webp مجاز است." };
 
   try {
+    // Receipt uploads use the independent Blob endpoint and do not depend on
+    // the broken Supabase bearer-token bridge.
+    if (bucket === "ticket-attachments") {
+      const body = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadReceiptToBlob({ data: { filename: file.name, contentType: file.type, body } });
+      if (!result.ok) return result;
+      return { ok: true, path: result.url };
+    }
+
     const refreshed = await supabase.auth.refreshSession();
     if (refreshed.error || !refreshed.data.session) {
       return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
@@ -31,18 +45,6 @@ export async function uploadImage(
       const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(signed.path, signed.token, file);
       if (error) return { ok: false, error: "آپلود فایل انجام نشد. دوباره تلاش کنید." };
       return { ok: true, path: signed.path };
-    }
-
-    if (bucket === "ticket-attachments") {
-      const body = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
-        reader.readAsDataURL(file);
-      });
-      const result = await uploadReceiptToBlob({ data: { filename: file.name, contentType: file.type, body } });
-      if (!result.ok) return result;
-      return { ok: true, path: result.url };
     }
 
     const signed = await createUploadUrl({ data: { bucket, ext: ext as Ext } });
