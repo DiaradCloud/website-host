@@ -17,12 +17,9 @@ export async function uploadImage(
   if (!ALLOWED.includes(ext as Ext)) return { ok: false, error: "فقط تصویر jpg/png/webp مجاز است." };
 
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session) {
-      const refreshed = await supabase.auth.refreshSession();
-      if (refreshed.error || !refreshed.data.session) {
-        return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
-      }
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error || !refreshed.data.session) {
+      return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
     }
     const { data: current } = await supabase.auth.getSession();
     if (!current.session) return { ok: false, error: "ابتدا وارد حساب خود شوید." };
