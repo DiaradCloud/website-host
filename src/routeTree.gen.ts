@@ -22,11 +22,14 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminBlogRouteImport } from './routes/admin.blog'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
+import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminPanelRouteImport } from './routes/admin.panel'
 import { Route as AdminSecurityRouteImport } from './routes/admin.security'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
+import { Route as AdminSponsorsRouteImport } from './routes/admin.sponsors'
 import { Route as AdminTicketsRouteImport } from './routes/admin.tickets'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as BlogIndexRouteImport } from './routes/blog.index'
@@ -103,9 +106,19 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBlogRoute = AdminBlogRouteImport.update({
+  id: '/blog',
+  path: '/blog',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCatalogRoute = AdminCatalogRouteImport.update({
   id: '/catalog',
   path: '/catalog',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFinanceRoute = AdminFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
@@ -126,6 +139,11 @@ const AdminSecurityRoute = AdminSecurityRouteImport.update({
 const AdminServicesRoute = AdminServicesRouteImport.update({
   id: '/services',
   path: '/services',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSponsorsRoute = AdminSponsorsRouteImport.update({
+  id: '/sponsors',
+  path: '/sponsors',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminTicketsRoute = AdminTicketsRouteImport.update({
@@ -192,11 +210,14 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
+  '/admin/blog': typeof AdminBlogRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/panel': typeof AdminPanelRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/services': typeof AdminServicesRoute
+  '/admin/sponsors': typeof AdminSponsorsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -220,11 +241,14 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
+  '/admin/blog': typeof AdminBlogRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/panel': typeof AdminPanelRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/services': typeof AdminServicesRoute
+  '/admin/sponsors': typeof AdminSponsorsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -251,11 +275,14 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/register': typeof RegisterRoute
   '/status': typeof StatusRoute
+  '/admin/blog': typeof AdminBlogRoute
   '/admin/catalog': typeof AdminCatalogRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/panel': typeof AdminPanelRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/services': typeof AdminServicesRoute
+  '/admin/sponsors': typeof AdminSponsorsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -283,11 +310,14 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/register'
     | '/status'
+    | '/admin/blog'
     | '/admin/catalog'
+    | '/admin/finance'
     | '/admin/login'
     | '/admin/panel'
     | '/admin/security'
     | '/admin/services'
+    | '/admin/sponsors'
     | '/admin/tickets'
     | '/admin/users'
     | '/blog/$slug'
@@ -311,11 +341,14 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/register'
     | '/status'
+    | '/admin/blog'
     | '/admin/catalog'
+    | '/admin/finance'
     | '/admin/login'
     | '/admin/panel'
     | '/admin/security'
     | '/admin/services'
+    | '/admin/sponsors'
     | '/admin/tickets'
     | '/admin/users'
     | '/blog/$slug'
@@ -341,11 +374,14 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/register'
     | '/status'
+    | '/admin/blog'
     | '/admin/catalog'
+    | '/admin/finance'
     | '/admin/login'
     | '/admin/panel'
     | '/admin/security'
     | '/admin/services'
+    | '/admin/sponsors'
     | '/admin/tickets'
     | '/admin/users'
     | '/blog/$slug'
@@ -469,11 +505,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/blog': {
+      id: '/admin/blog'
+      path: '/blog'
+      fullPath: '/admin/blog'
+      preLoaderRoute: typeof AdminBlogRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/catalog': {
       id: '/admin/catalog'
       path: '/catalog'
       fullPath: '/admin/catalog'
       preLoaderRoute: typeof AdminCatalogRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/finance': {
+      id: '/admin/finance'
+      path: '/finance'
+      fullPath: '/admin/finance'
+      preLoaderRoute: typeof AdminFinanceRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/login': {
@@ -502,6 +552,13 @@ declare module '@tanstack/react-router' {
       path: '/services'
       fullPath: '/admin/services'
       preLoaderRoute: typeof AdminServicesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/sponsors': {
+      id: '/admin/sponsors'
+      path: '/sponsors'
+      fullPath: '/admin/sponsors'
+      preLoaderRoute: typeof AdminSponsorsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/tickets': {
@@ -578,22 +635,28 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminBlogRoute: typeof AdminBlogRoute
   AdminCatalogRoute: typeof AdminCatalogRoute
+  AdminFinanceRoute: typeof AdminFinanceRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminPanelRoute: typeof AdminPanelRoute
   AdminSecurityRoute: typeof AdminSecurityRoute
   AdminServicesRoute: typeof AdminServicesRoute
+  AdminSponsorsRoute: typeof AdminSponsorsRoute
   AdminTicketsRoute: typeof AdminTicketsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBlogRoute: AdminBlogRoute,
   AdminCatalogRoute: AdminCatalogRoute,
+  AdminFinanceRoute: AdminFinanceRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminPanelRoute: AdminPanelRoute,
   AdminSecurityRoute: AdminSecurityRoute,
   AdminServicesRoute: AdminServicesRoute,
+  AdminSponsorsRoute: AdminSponsorsRoute,
   AdminTicketsRoute: AdminTicketsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
