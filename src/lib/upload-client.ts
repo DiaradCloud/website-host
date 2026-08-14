@@ -13,12 +13,20 @@ export async function uploadImage(
   const ext = (file.name.split(".").pop() ?? "").toLowerCase();
   if (!ALLOWED.includes(ext as Ext)) return { ok: false, error: "فقط تصویر jpg/png/webp مجاز است." };
 
-  const signed = await createUploadUrl({ data: { bucket, ext: ext as Ext } });
-  if (!signed.ok) return { ok: false, error: signed.error };
+  try {
+    const signed = await createUploadUrl({ data: { bucket, ext: ext as Ext } });
+    if (!signed.ok) return { ok: false, error: signed.error };
 
-  const { error } = await supabase.storage
-    .from(bucket)
-    .uploadToSignedUrl(signed.path, signed.token, file);
-  if (error) return { ok: false, error: "آپلود فایل انجام نشد." };
-  return { ok: true, path: signed.path };
+    const { error } = await supabase.storage
+      .from(bucket)
+      .uploadToSignedUrl(signed.path, signed.token, file, { upsert: false });
+    if (error) {
+      console.error("[v0] Signed receipt upload failed:", error.message, error.name);
+      return { ok: false, error: "آپلود فایل انجام نشد. دوباره تلاش کنید." };
+    }
+    return { ok: true, path: signed.path };
+  } catch (error) {
+    console.error("[v0] Receipt upload request failed:", error);
+    return { ok: false, error: "دریافت مجوز بارگذاری انجام نشد. دوباره وارد حساب شوید و تلاش کنید." };
+  }
 }

@@ -80,14 +80,15 @@ function OrderPage() {
   async function onReceipt(file: File | undefined) {
     if (!file) return;
     setUploadError("");
-    if (!file.type.startsWith("image/")) {
-      setUploadError("فقط فایل تصویری قابل قبول است.");
-      toast.error("فقط فایل تصویری قابل قبول است.");
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!file.type.startsWith("image/") || !["jpg", "jpeg", "png", "webp", "gif"].includes(extension ?? "")) {
+      setUploadError("فقط تصویر JPG، PNG، WEBP یا GIF قابل قبول است.");
+      toast.error("فقط تصویر JPG، PNG، WEBP یا GIF قابل قبول است.");
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setUploadError("حجم تصویر باید کمتر از ۸ مگابایت باشد.");
-      toast.error("حجم تصویر باید کمتر از ۸ مگابایت باشد.");
+    if (file.size > 6 * 1024 * 1024) {
+      setUploadError("حجم تصویر باید کمتر از ۶ مگابایت باشد.");
+      toast.error("حجم تصویر باید کمتر از ۶ مگابایت باشد.");
       return;
     }
     setUploading(true);
