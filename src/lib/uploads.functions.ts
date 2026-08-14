@@ -19,6 +19,16 @@ export const createUploadUrl = createServerFn({ method: "POST" })
       if (!staff) throw new Error("Forbidden");
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Self-heal deployments where the Storage bucket was not provisioned.
+    // This is idempotent and runs only when an upload authorization is requested.
+    const { data: buckets, error: bucketsError } = await supabaseAdmin.storage.listBuckets();
+    if (!bucketsError && !buckets?.some((bucket) => bucket.name === data.bucket)) {
+      const { error: createBucketError } = await supabaseAdmin.storage.createBucket(data.bucket, { public: false, fileSizeLimit: "6MB" });
+      if (createBucketError && !/already exists/i.test(createBucketError.message)) {
+        console.error("[v0] Storage bucket provisioning failed:", createBucketError.message);
+        return { ok: false as const, error: "فضای بارگذاری هنوز آماده نیست. دوباره تلاش کنید." };
+      }
+    }
     const path = `${context.userId}/${crypto.randomUUID()}.${data.ext}`;
     const { data: signed, error } = await supabaseAdmin.storage
       .from(data.bucket)
