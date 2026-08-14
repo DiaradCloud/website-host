@@ -3,7 +3,7 @@
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable
-
+/
 Open your project in the [Lovable editor](https://lovable.dev) and keep building.
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
