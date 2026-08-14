@@ -11,9 +11,29 @@ const orderSchema = z.object({
   os: z.string().trim().min(2).max(40).default("Ubuntu 24.04"),
   addons: z.array(z.string().uuid()).max(10).default([]),
   serviceName: z.string().trim().min(2).max(40),
-  receiptPath: z.string().trim().max(300).optional(),
+  receiptPath: z.string().trim().max(1000).optional(),
   note: z.string().trim().max(1000).optional(),
 });
+
+function extractStoragePath(maybeUrl?: string | null) {
+  if (!maybeUrl) return null;
+  try {
+    // If it's a URL (signed url), try to extract the pathname and locate the bucket path
+    const url = new URL(maybeUrl);
+    // Some signed URLs include the full path after the host, possibly with /storage/v1/object/public/... or /attachments/...
+    const path = url.pathname.replace(/^\//, "");
+    // Try to find attachments/ substring
+    const idx = path.indexOf("attachments/");
+    if (idx !== -1) return path.slice(idx + "attachments/".length);
+    // Otherwise return the raw pathname
+    return path;
+  } catch {
+    // Not a URL, treat as direct storage path like receipts/{userId}/...
+    const asPath = maybeUrl;
+    // If the client passed a leading slash, remove it
+    return asPath.replace(/^\//, "");
+  }
+}
 
 /**
  * Creates a purchase/renewal order, opens the payment ticket, and posts the
@@ -100,42 +120,39 @@ export const placeOrder = createServerFn({ method: "POST" })
       data.kind === "renew"
         ? "تمدید سرویس"
         : data.kind === "intl"
-          ? "اینترنت بین‌الملل"
-          : data.kind === "upgrade"
-            ? "ارتقای سرویس"
-            : "خرید ابرک";
+        ? "اینترنت بین‌الملل"
+        : data.kind === "upgrade"
+        ? "ارتقای سرویس"
+        : "خرید ابرک";
 
-    const { data: ticket, error: ticketError } = await supabaseAdmin
-      .from("tickets")
-      .insert({
-        user_id: userId,
-        order_id: order.id,
-        service_id: data.serviceId ?? null,
-        subject: `${kindLabel} — ${data.serviceName} (${order.code})`,
-        department: "payment",
-        priority: "high",
-        status: "open",
-      })
-      .select("id, code")
-      .single();
+    // Ticket + messages creation must be atomic-ish: if messages fail, cleanup uploaded
+    // receipt (if any) and rollback the created order to avoid orphans.
+    try {
+      const { data: ticket, error: ticketError } = await supabaseAdmin
+        .from("tickets")
+        .insert({
+          user_id: userId,
+          order_id: order.id,
+          service_id: data.serviceId ?? null,
+          subject: `${kindLabel} — ${data.serviceName} (${order.code})`,
+          department: "payment",
+          priority: "high",
+          status: "open",
+        })
+        .select("id, code")
+        .single();
 
-    if (ticketError || !ticket) {
-      console.error("[v0] Payment ticket creation failed:", ticketError?.message, ticketError?.details);
-      await supabaseAdmin.from("orders").delete().eq("id", order.id);
-      return { ok: false as const, error: "تیکت پرداخت ساخته نشد؛ سفارش ثبت نشد. دوباره تلاش کنید." };
-    }
-    const { error: messageError } = await supabaseAdmin.from("ticket_messages").insert([
+      if (ticketError || !ticket) throw ticketError ?? new Error("Ticket creation failed");
+
+      const { error: messageError } = await supabaseAdmin.from("ticket_messages").insert([
         {
           ticket_id: ticket.id,
           sender_id: userId,
           sender_name: fullName,
           is_staff: false,
           body:
-            `${kindLabel}\nنام سرویس: ${data.serviceName}\nمدت: ${data.durationMonths} ماه (${
-              data.durationMonths * DAYS_PER_MONTH
-            } روز)\nسیستم عامل: ${data.os}\nمبلغ: ${amount} تومان\nشبکه: ${
-              profile?.network_name ?? "-"
-            }` + (data.note ? `\nتوضیح: ${data.note}` : ""),
+            `${kindLabel}\nنام سرویس: ${data.serviceName}\nمدت: ${data.durationMonths} ماه (${data.durationMonths * DAYS_PER_MONTH} روز)\nسیستم عامل: ${data.os}\nمبلغ: ${amount} تومان\nشبکه: ${profile?.network_name ?? "-"}` +
+            (data.note ? `\nتوضیح: ${data.note}` : ""),
           attachment_path: data.receiptPath ?? null,
         },
         {
@@ -145,264 +162,43 @@ export const placeOrder = createServerFn({ method: "POST" })
           body: AUTO_PAYMENT_MESSAGE,
         },
       ]);
-    if (messageError) {
-      console.error("[v0] Payment ticket message creation failed:", messageError.message, messageError.details);
-      return { ok: false as const, error: "تیکت ساخته شد اما اطلاعات پرداخت ذخیره نشد. با پشتیبانی تماس بگیرید." };
-    }
-    await supabaseAdmin.from("orders").update({ ticket_id: ticket.id }).eq("id", order.id);
 
-    await supabaseAdmin.from("notifications").insert({
-      user_id: userId,
-      title: `سفارش ${order.code} ثبت شد`,
-      body: AUTO_PAYMENT_MESSAGE,
-      level: "info",
-      link: "/dashboard/tickets",
-    });
+      if (messageError) throw messageError;
 
-    return { ok: true as const, code: order.code, ticketCode: ticket?.code ?? null, amount };
-  });
+      await supabaseAdmin.from("orders").update({ ticket_id: ticket.id }).eq("id", order.id);
 
-/** Opens a support ticket from the user panel (any department). */
-export const openTicket = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({
-        subject: z.string().trim().min(3).max(150),
-        body: z.string().trim().min(5).max(4000),
-        department: z.enum(["password", "technical", "payment", "abuse"]),
-        priority: z.enum(["low", "normal", "high"]),
-        serviceId: z.string().uuid().optional(),
-        attachmentPath: z.string().trim().max(300).optional(),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("first_name, last_name")
-      .eq("id", context.userId)
-      .maybeSingle();
+      await supabaseAdmin.from("notifications").insert({
+        user_id: userId,
+        title: `سفارش ${order.code} ثبت شد`,
+        body: AUTO_PAYMENT_MESSAGE,
+        level: "info",
+        link: "/dashboard/tickets",
+      });
 
-    const { data: ticket, error } = await supabaseAdmin
-      .from("tickets")
-      .insert({
-        user_id: context.userId,
-        service_id: data.serviceId ?? null,
-        subject: data.subject,
-        department: data.department,
-        priority: data.priority,
-        status: "open",
-      })
-      .select("id, code")
-      .single();
-    if (error || !ticket) return { ok: false as const, error: "ارسال تیکت انجام نشد." };
+      return { ok: true as const, code: order.code, ticketCode: ticket?.code ?? null, amount };
+    } catch (err) {
+      console.error("[v0] Order/ticket flow failed:", err);
 
-    const { error: messageError } = await supabaseAdmin.from("ticket_messages").insert({
-      ticket_id: ticket.id,
-      sender_id: context.userId,
-      sender_name: profile ? `${profile.first_name} ${profile.last_name}` : "کاربر",
-      is_staff: false,
-      body: data.body,
-      attachment_path: data.attachmentPath ?? null,
-    });
-    if (messageError) {
-      console.error("[v0] Standalone ticket message failed:", messageError.message, messageError.details);
-      await supabaseAdmin.from("tickets").delete().eq("id", ticket.id);
-      return { ok: false as const, error: "پیام تیکت ذخیره نشد؛ تیکت ثبت نشد." };
-    }
-
-    return { ok: true as const, code: ticket.code, id: ticket.id };
-  });
-
-/** Requests a fresh VPS root/user password for a service the caller owns. */
-export const requestVpsPassword = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({ serviceId: z.string().uuid(), note: z.string().trim().max(600).default("") })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: service } = await supabaseAdmin
-      .from("services")
-      .select("id, name, user_id")
-      .eq("id", data.serviceId)
-      .maybeSingle();
-    if (!service || service.user_id !== context.userId) {
-      return { ok: false as const, error: "سرویس یافت نشد." };
-    }
-
-    await supabaseAdmin.from("vps_password_requests").insert({
-      user_id: context.userId,
-      service_id: service.id,
-      note: data.note,
-      status: "pending",
-    });
-
-    const { data: ticket } = await supabaseAdmin
-      .from("tickets")
-      .insert({
-        user_id: context.userId,
-        service_id: service.id,
-        subject: `درخواست رمز جدید سرویس — ${service.name}`,
-        department: "technical",
-        priority: "high",
-      })
-      .select("id")
-      .single();
-
-    if (ticket) {
-      await supabaseAdmin.from("ticket_messages").insert([
-        {
-          ticket_id: ticket.id,
-          sender_id: context.userId,
-          sender_name: "کاربر",
-          body: data.note || "رمز سرویس خود را فراموش کرده‌ام، لطفا رمز جدید صادر شود.",
-        },
-        {
-          ticket_id: ticket.id,
-          sender_name: "سیستم هوشمند دیارا",
-          is_staff: true,
-          body:
-            "درود. من سیستم هوشمند دیارا هستم. درخواست رمز جدید سرویس شما ثبت شد و پس از بررسی، رمز تازه در همین تیکت ارسال می‌شود. باتشکر. تیم پشتیبانی دیارا",
-        },
-      ]);
-    }
-
-    return { ok: true as const };
-  });
-
-/** International-internet activation request (KYC reviewed by support). */
-export const requestIntl = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({
-        serviceId: z.string().uuid(),
-        kycNote: z.string().trim().min(10).max(1500),
-        attachmentPath: z.string().trim().max(300).optional(),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: service } = await supabaseAdmin
-      .from("services")
-      .select("id, name, user_id, intl_enabled")
-      .eq("id", data.serviceId)
-      .maybeSingle();
-    if (!service || service.user_id !== context.userId) {
-      return { ok: false as const, error: "سرویس یافت نشد." };
-    }
-    if (service.intl_enabled) return { ok: false as const, error: "این سرویس از قبل فعال است." };
-
-    const { data: pending } = await supabaseAdmin
-      .from("intl_requests")
-      .select("id")
-      .eq("service_id", service.id)
-      .eq("status", "pending")
-      .maybeSingle();
-    if (pending) return { ok: false as const, error: "درخواست قبلی شما در حال بررسی است." };
-
-    await supabaseAdmin.from("intl_requests").insert({
-      user_id: context.userId,
-      service_id: service.id,
-      kyc_note: data.kycNote,
-      status: "pending",
-    });
-
-    const { data: ticket } = await supabaseAdmin
-      .from("tickets")
-      .insert({
-        user_id: context.userId,
-        service_id: service.id,
-        subject: `احراز هویت اینترنت بین‌الملل — ${service.name}`,
-        department: "technical",
-        priority: "normal",
-      })
-      .select("id")
-      .single();
-
-    if (ticket) {
-      await supabaseAdmin.from("ticket_messages").insert([
-        {
-          ticket_id: ticket.id,
-          sender_id: context.userId,
-          sender_name: "کاربر",
-          body: data.kycNote,
-          attachment_path: data.attachmentPath ?? null,
-        },
-        {
-          ticket_id: ticket.id,
-          sender_name: "سیستم هوشمند دیارا",
-          is_staff: true,
-          body:
-            "درود. من سیستم هوشمند دیارا هستم. مدارک احراز هویت شما برای تیم پشتیبانی ارسال شد. پس از بررسی، نتیجه فعال‌سازی اینترنت بین‌الملل در همین تیکت اعلام می‌شود و آی‌پی سرویس شما تغییری نخواهد کرد. باتشکر. تیم پشتیبانی دیارا",
-        },
-      ]);
-    }
-
-    return { ok: true as const };
-  });
-
-/**
- * Housekeeping for the caller's services: expires overdue ones and raises a
- * bandwidth warning notification once per service.
- */
-export const syncMyServices = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: services } = await supabaseAdmin
-      .from("services")
-      .select("id, name, status, expires_at, bandwidth_gb, bandwidth_used_gb")
-      .eq("user_id", context.userId);
-
-    let expired = 0;
-    let warned = 0;
-    for (const service of services ?? []) {
-      if (
-        service.status === "active" &&
-        service.expires_at &&
-        new Date(service.expires_at).getTime() < Date.now()
-      ) {
-        await supabaseAdmin.from("services").update({ status: "expired" }).eq("id", service.id);
-        await supabaseAdmin.from("notifications").insert({
-          user_id: context.userId,
-          title: `سرویس ${service.name} منقضی شد`,
-          body: "برای ادامه استفاده، سرویس خود را از بخش سرویس‌ها تمدید کنید.",
-          level: "warning",
-          link: "/dashboard/services",
-        });
-        expired += 1;
-      }
-
-      if (
-        service.bandwidth_gb > 0 &&
-        service.bandwidth_used_gb / service.bandwidth_gb >= 0.85 &&
-        service.status === "active"
-      ) {
-        const { data: existing } = await supabaseAdmin
-          .from("notifications")
-          .select("id")
-          .eq("user_id", context.userId)
-          .eq("title", `هشدار ترافیک ${service.name}`)
-          .gte("created_at", new Date(Date.now() - 86_400_000 * 3).toISOString())
-          .maybeSingle();
-        if (!existing) {
-          await supabaseAdmin.from("notifications").insert({
-            user_id: context.userId,
-            title: `هشدار ترافیک ${service.name}`,
-            body: "بیش از ۸۵٪ پهنای باند این ماه مصرف شده است. در صورت اتمام، سرویس محدود می‌شود.",
-            level: "warning",
-            link: "/dashboard/services",
-          });
-          warned += 1;
+      // Attempt cleanup: remove uploaded receipt if present
+      try {
+        if (data.receiptPath) {
+          const maybePath = extractStoragePath(data.receiptPath);
+          if (maybePath) {
+            // If extractStoragePath returned a path relative to attachments, remove it
+            await supabaseAdmin.storage.from("attachments").remove([maybePath]);
+          }
         }
+      } catch (cleanupErr) {
+        console.error("[v0] Cleanup failed:", cleanupErr);
       }
+
+      // Rollback order
+      try {
+        await supabaseAdmin.from("orders").delete().eq("id", order.id);
+      } catch (delErr) {
+        console.error("[v0] Order rollback failed:", delErr);
+      }
+
+      return { ok: false as const, error: "ثبت سفارش انجام نشد. لطفا دوباره تلاش کنید." };
     }
-    return { expired, warned };
   });
