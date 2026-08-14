@@ -28,9 +28,17 @@ function TicketsPage() {
     if (!session?.user || subject.trim().length < 3 || body.trim().length < 2) return;
     setBusy(true);
     const { data: ticket, error } = await supabase.from("tickets").insert({ user_id: session.user.id, subject: subject.trim(), department: "technical", priority: "normal" }).select("id").single();
-    if (!error && ticket) await replyTicket({ data: { ticketId: ticket.id, body: body.trim() } });
+    if (error || !ticket) {
+      console.error("[v0] Ticket creation failed:", error?.message, error?.details);
+      setBusy(false);
+      return toast.error("ثبت تیکت انجام نشد. لطفاً دوباره تلاش کنید.");
+    }
+    const reply = await replyTicket({ data: { ticketId: ticket.id, body: body.trim() } });
     setBusy(false);
-    if (error || !ticket) return toast.error("ثبت تیکت انجام نشد.");
+    if (!reply?.ok) {
+      console.error("[v0] Ticket first message failed:", reply);
+      return toast.error("تیکت ساخته شد اما متن پیام ذخیره نشد. لطفاً از بخش تیکت‌ها دوباره ارسال کنید.");
+    }
     setSubject(""); setBody("");
     toast.success("تیکت شما ثبت شد.");
     await queryClient.invalidateQueries({ queryKey: ["my-tickets"] });

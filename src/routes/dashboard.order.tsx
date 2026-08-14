@@ -30,6 +30,7 @@ function OrderPage() {
   const [note, setNote] = useState("");
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const { data: plans = [] } = useQuery({
@@ -78,15 +79,37 @@ function OrderPage() {
 
   async function onReceipt(file: File | undefined) {
     if (!file) return;
-    setUploading(true);
-    const result = await uploadImage("attachments", file);
-    setUploading(false);
-    if (!result.ok) {
-      toast.error(result.error);
+    setUploadError("");
+    if (!file.type.startsWith("image/")) {
+      setUploadError("فقط فایل تصویری قابل قبول است.");
+      toast.error("فقط فایل تصویری قابل قبول است.");
       return;
     }
-    setReceiptPath(result.path);
-    toast.success("رسید بارگذاری شد.");
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError("حجم تصویر باید کمتر از ۸ مگابایت باشد.");
+      toast.error("حجم تصویر باید کمتر از ۸ مگابایت باشد.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const result = await Promise.race([
+        uploadImage("attachments", file),
+        new Promise<{ ok: false; error: string }>((resolve) => setTimeout(() => resolve({ ok: false, error: "بارگذاری بیش از حد طول کشید. دوباره تلاش کنید." }), 30000)),
+      ]);
+      if (!result.ok) {
+        setUploadError(result.error);
+        toast.error(result.error);
+        return;
+      }
+      setReceiptPath(result.path);
+      toast.success("رسید بارگذاری شد.");
+    } catch (error) {
+      console.error("[v0] Receipt upload failed:", error);
+      setUploadError("بارگذاری رسید انجام نشد. اتصال اینترنت و دسترسی فایل را بررسی کنید.");
+      toast.error("بارگذاری رسید انجام نشد.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function submit() {
@@ -283,6 +306,7 @@ function OrderPage() {
             onChange={(e) => void onReceipt(e.target.files?.[0])}
           />
         </label>
+        {uploadError && <p className="text-xs text-destructive" role="alert">{uploadError}</p>}
 
         <textarea
           value={note}
@@ -294,7 +318,7 @@ function OrderPage() {
 
         <button
           onClick={() => void submit()}
-          disabled={busy}
+          disabled={busy || uploading}
           className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
         >
           {busy ? "در حال ثبت…" : "ثبت سفارش و ارسال رسید"}
