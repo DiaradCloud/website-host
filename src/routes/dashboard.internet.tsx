@@ -49,7 +49,7 @@ function InternetPage() {
 
   async function upload(file: File | undefined, target: "kyc" | "receipt") {
     if (!file) return;
-    const result = await uploadImage("attachments", file);
+    const result = await uploadImage("ticket-attachments", file);
     if (!result.ok) {
       toast.error(result.error);
       return;

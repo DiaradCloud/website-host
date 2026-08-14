@@ -68,7 +68,7 @@ export const guestUploadUrl = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const path = `guest/${crypto.randomUUID()}.${data.ext}`;
     const { data: signed, error } = await supabaseAdmin.storage
-      .from("attachments")
+      .from("ticket-attachments")
       .createSignedUploadUrl(path);
     if (error || !signed) return { ok: false as const, error: "آپلود در دسترس نیست." };
     return { ok: true as const, path, token: signed.token };

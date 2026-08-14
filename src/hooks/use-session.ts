@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { clearStaleSession, isStaleSessionError } from "@/lib/auth-recovery";
 import type { User } from "@supabase/supabase-js";
 
 export type Profile = {
@@ -27,10 +28,22 @@ export type SessionState = {
 
 export const sessionQueryKey = ["session"] as const;
 
+const LOGGED_OUT_STATE: SessionState = { user: null, profile: null, roles: [], isStaff: false, isAdmin: false };
+
 export async function loadSession(): Promise<SessionState> {
-  const { data } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    // A rotated signing key or revoked session leaves a token the server can
+    // never verify again. Drop it locally instead of leaving the UI stuck in
+    // a half-signed-in state where every action fails silently.
+    if (isStaleSessionError(error)) {
+      console.error("[v0] Stale session detected, signing out:", error.message);
+      await clearStaleSession();
+    }
+    return LOGGED_OUT_STATE;
+  }
   const user = data.user ?? null;
-  if (!user) return { user: null, profile: null, roles: [], isStaff: false, isAdmin: false };
+  if (!user) return LOGGED_OUT_STATE;
 
   const [{ data: profile }, { data: roleRows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),

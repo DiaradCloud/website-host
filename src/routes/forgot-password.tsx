@@ -48,7 +48,7 @@ function ForgotPasswordPage() {
           return;
         }
         const { error } = await supabase.storage
-          .from("attachments")
+          .from("ticket-attachments")
           .uploadToSignedUrl(target.path, target.token, file);
         if (error) {
           toast.error("آپلود تصویر انجام نشد.");

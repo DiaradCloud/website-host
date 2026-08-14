@@ -105,7 +105,7 @@ export const placeOrder = createServerFn({ method: "POST" })
             ? "ارتقای سرویس"
             : "خرید ابرک";
 
-    const { data: ticket } = await supabaseAdmin
+    const { data: ticket, error: ticketError } = await supabaseAdmin
       .from("tickets")
       .insert({
         user_id: userId,
@@ -119,8 +119,12 @@ export const placeOrder = createServerFn({ method: "POST" })
       .select("id, code")
       .single();
 
-    if (ticket) {
-      await supabaseAdmin.from("ticket_messages").insert([
+    if (ticketError || !ticket) {
+      console.error("[v0] Payment ticket creation failed:", ticketError?.message, ticketError?.details);
+      await supabaseAdmin.from("orders").delete().eq("id", order.id);
+      return { ok: false as const, error: "تیکت پرداخت ساخته نشد؛ سفارش ثبت نشد. دوباره تلاش کنید." };
+    }
+    const { error: messageError } = await supabaseAdmin.from("ticket_messages").insert([
         {
           ticket_id: ticket.id,
           sender_id: userId,
@@ -141,8 +145,11 @@ export const placeOrder = createServerFn({ method: "POST" })
           body: AUTO_PAYMENT_MESSAGE,
         },
       ]);
-      await supabaseAdmin.from("orders").update({ ticket_id: ticket.id }).eq("id", order.id);
+    if (messageError) {
+      console.error("[v0] Payment ticket message creation failed:", messageError.message, messageError.details);
+      return { ok: false as const, error: "تیکت ساخته شد اما اطلاعات پرداخت ذخیره نشد. با پشتیبانی تماس بگیرید." };
     }
+    await supabaseAdmin.from("orders").update({ ticket_id: ticket.id }).eq("id", order.id);
 
     await supabaseAdmin.from("notifications").insert({
       user_id: userId,
@@ -192,7 +199,7 @@ export const openTicket = createServerFn({ method: "POST" })
       .single();
     if (error || !ticket) return { ok: false as const, error: "ارسال تیکت انجام نشد." };
 
-    await supabaseAdmin.from("ticket_messages").insert({
+    const { error: messageError } = await supabaseAdmin.from("ticket_messages").insert({
       ticket_id: ticket.id,
       sender_id: context.userId,
       sender_name: profile ? `${profile.first_name} ${profile.last_name}` : "کاربر",
@@ -200,6 +207,11 @@ export const openTicket = createServerFn({ method: "POST" })
       body: data.body,
       attachment_path: data.attachmentPath ?? null,
     });
+    if (messageError) {
+      console.error("[v0] Standalone ticket message failed:", messageError.message, messageError.details);
+      await supabaseAdmin.from("tickets").delete().eq("id", ticket.id);
+      return { ok: false as const, error: "پیام تیکت ذخیره نشد؛ تیکت ثبت نشد." };
+    }
 
     return { ok: true as const, code: ticket.code, id: ticket.id };
   });
