@@ -10,7 +10,7 @@ const SESSION_EXPIRED_ERROR = "نشست شما منقضی شده است. صفح�
 
 /** Uploads an image to a private bucket through a server-issued signed URL. */
 export async function uploadImage(
-  bucket: "ticket-attachments" | "blog",
+  bucket: "attachments" | "blog",
   file: File,
 ): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
   if (file.size > 6 * 1024 * 1024) return { ok: false, error: "حجم فایل باید کمتر از ۶ مگابایت باشد." };
@@ -20,7 +20,7 @@ export async function uploadImage(
   try {
     // Receipt uploads use the independent Blob endpoint and do not depend on
     // the broken Supabase bearer-token bridge.
-    if (bucket === "ticket-attachments") {
+    if (bucket === "attachments") {
       const body = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
