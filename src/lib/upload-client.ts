@@ -17,6 +17,13 @@ export async function uploadImage(
   if (!ALLOWED.includes(ext as Ext)) return { ok: false, error: "فقط تصویر jpg/png/webp مجاز است." };
 
   try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.error || !refreshed.data.session) {
+        return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
+      }
+    }
     const signed = await createUploadUrl({ data: { bucket, ext: ext as Ext } });
     if (!signed.ok) return { ok: false, error: signed.error };
     const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(signed.path, signed.token, file);
@@ -34,6 +41,10 @@ export async function uploadImage(
     if (isStaleSessionError(error)) {
       await clearStaleSession();
       return { ok: false, error: SESSION_EXPIRED_ERROR };
+    }
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (/unauthorized|no authorization header/i.test(message)) {
+      return { ok: false, error: "مجوز بارگذاری صادر نشد. صفحه را یک‌بار تازه‌سازی کنید و دوباره تلاش کنید." };
     }
     return { ok: false, error: "آپلود فایل انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید." };
   }

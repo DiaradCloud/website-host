@@ -16,7 +16,6 @@ const STALE_SESSION_PATTERNS = [
   /jwt signature/i,
   /invalid jwt/i,
   /invalid claim/i,
-  /unauthorized/i,
   /pgrst301/i,
 ];
 
