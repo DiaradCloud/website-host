@@ -2,8 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BrandMark } from "@/components/brand/logo";
-import { supabase } from "@/integrations/supabase/client";
 import { hasStandaloneAdminSession, setStandaloneAdminSession } from "@/lib/admin-session";
+import { authenticateStandaloneAdmin } from "@/lib/admin-auth.functions";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "ورود مدیریت — دیاراد کلود" }, { name: "robots", content: "noindex" }] }),
@@ -24,22 +24,16 @@ export function AdminLoginPage() {
     event.preventDefault();
     setBusy(true);
     const normalizedUsername = username.trim().toLowerCase();
-    const { data, error } = await supabase.rpc("authenticate_admin", {
-      p_username: normalizedUsername,
-      p_password: password,
-    });
-    setBusy(false);
     let result: { authenticated?: boolean } | null = null;
     try {
-      result = typeof data === "string" ? JSON.parse(data) as { authenticated?: boolean } : data as { authenticated?: boolean } | null;
-    } catch {
-      result = null;
-    }
-    if (error) {
-      console.error("[v0] Admin login RPC failed:", error.message, error.details);
+      result = await authenticateStandaloneAdmin({ data: { username: normalizedUsername, password } });
+    } catch (error) {
+      console.error("[v0] Admin server authentication failed:", error);
+      setBusy(false);
       toast.error("ورود مدیریت موقتاً در دسترس نیست. دوباره تلاش کنید.");
       return;
     }
+    setBusy(false);
     if (!result?.authenticated) {
       toast.error("نام کاربری یا رمز عبور اشتباه است.");
       return;
