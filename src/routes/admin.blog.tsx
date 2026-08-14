@@ -1,14 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/blog")({ component: AdminBlog });
 
+type Draft = { title: string; slug: string; tag: string; excerpt: string; body: string; published: boolean };
+const emptyDraft: Draft = { title: "", slug: "", tag: "عمومی", excerpt: "", body: "", published: false };
+
 function AdminBlog() {
+  const client = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
   const { data = [], isLoading } = useQuery({ queryKey: ["admin-blog"], queryFn: async () => {
     const { data, error } = await supabase.from("blog_posts").select("id, title, slug, tag, published, updated_at").order("updated_at", { ascending: false });
     if (error) throw error;
     return data ?? [];
   } });
-  return <section className="surface"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">ادیتور بلاگ</h2><p className="mt-1 text-xs text-muted-foreground">مدیریت مقاله‌ها، پیش‌نویس‌ها و انتشار</p></div><button className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground">مقاله جدید</button></div><div className="mt-5 overflow-x-auto"><table className="w-full text-right text-xs"><thead className="text-muted-foreground"><tr><th className="pb-3">عنوان</th><th className="pb-3">دسته‌بندی</th><th className="pb-3">وضعیت</th><th className="pb-3">آخرین ویرایش</th></tr></thead><tbody>{isLoading ? <tr><td colSpan={4} className="py-5 text-muted-foreground">در حال بارگذاری…</td></tr> : data.map((post) => <tr key={post.id} className="border-t border-border"><td className="py-3 font-medium">{post.title}</td><td className="py-3 text-muted-foreground">{post.tag || "عمومی"}</td><td className="py-3">{post.published ? "منتشر شده" : "پیش‌نویس"}</td><td className="py-3 text-muted-foreground">{new Date(post.updated_at).toLocaleDateString("fa-IR")}</td></tr>)}</tbody></table></div></section>;
+
+  function update(field: keyof Draft, value: string | boolean) { setDraft((current) => ({ ...current, [field]: value })); }
+  async function createPost() {
+    if (!draft.title.trim() || !draft.slug.trim() || !draft.body.trim()) { toast.error("عنوان، مسیر و متن مقاله الزامی است."); return; }
+    setSaving(true);
+    const { error } = await supabase.from("blog_posts").insert({ ...draft, read_minutes: Math.max(1, Math.ceil(draft.body.trim().split(/\\s+/).length / 180)) });
+    setSaving(false);
+    if (error) { toast.error("ثبت مقاله انجام نشد."); return; }
+    toast.success("مقاله با موفقیت ثبت شد.");
+    setOpen(false); setDraft(emptyDraft);
+    await client.invalidateQueries({ queryKey: ["admin-blog"] });
+  }
+
+  return <section className="surface">
+    <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">ادیتور بلاگ</h2><p className="mt-1 text-xs text-muted-foreground">مدیریت مقاله‌ها، پیش‌نویس‌ها و انتشار</p></div><button type="button" onClick={() => setOpen(true)} className="cursor-pointer rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90">مقاله جدید</button></div>
+    {open && <div className="mt-5 rounded-lg border border-border bg-background p-4"><div className="grid gap-3 md:grid-cols-2">
+      <label className="flex flex-col gap-1 text-xs"><span>عنوان</span><input value={draft.title} onChange={(e) => update("title", e.target.value)} className="rounded-md border border-border bg-background px-3 py-2" /></label>
+      <label className="flex flex-col gap-1 text-xs"><span>مسیر انگلیسی</span><input value={draft.slug} onChange={(e) => update("slug", e.target.value)} dir="ltr" className="rounded-md border border-border bg-background px-3 py-2" /></label>
+      <label className="flex flex-col gap-1 text-xs"><span>دسته‌بندی</span><input value={draft.tag} onChange={(e) => update("tag", e.target.value)} className="rounded-md border border-border bg-background px-3 py-2" /></label>
+      <label className="flex flex-col gap-1 text-xs"><span>خلاصه</span><input value={draft.excerpt} onChange={(e) => update("excerpt", e.target.value)} className="rounded-md border border-border bg-background px-3 py-2" /></label>
+    </div><label className="mt-3 flex flex-col gap-1 text-xs"><span>متن مقاله</span><textarea value={draft.body} onChange={(e) => update("body", e.target.value)} rows={8} className="resize-y rounded-md border border-border bg-background px-3 py-2" /></label><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.published} onChange={(e) => update("published", e.target.checked)} /> انتشار فوری</label><div className="mt-4 flex gap-2"><button type="button" disabled={saving} onClick={() => void createPost()} className="cursor-pointer rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50">{saving ? "در حال ذخیره…" : "ذخیره مقاله"}</button><button type="button" onClick={() => setOpen(false)} className="cursor-pointer rounded-md border border-border px-4 py-2 text-xs">انصراف</button></div></div>}
+    <div className="mt-5 overflow-x-auto"><table className="w-full text-right text-xs"><thead className="text-muted-foreground"><tr><th className="pb-3">عنوان</th><th className="pb-3">دسته‌بندی</th><th className="pb-3">وضعیت</th><th className="pb-3">آخرین ویرایش</th></tr></thead><tbody>{isLoading ? <tr><td colSpan={4} className="py-5 text-muted-foreground">در حال بارگذاری…</td></tr> : data.map((post) => <tr key={post.id} className="border-t border-border"><td className="py-3 font-medium">{post.title}</td><td className="py-3 text-muted-foreground">{post.tag || "عمومی"}</td><td className="py-3">{post.published ? "منتشر شده" : "پیش‌نویس"}</td><td className="py-3 text-muted-foreground">{new Date(post.updated_at).toLocaleDateString("fa-IR")}</td></tr>)}</tbody></table></div>
+  </section>;
 }
