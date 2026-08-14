@@ -21,17 +21,33 @@ export async function uploadImage(
     // Receipt uploads use the independent Blob endpoint and do not depend on
     // the broken Supabase bearer-token bridge.
     if (bucket === "attachments") {
+      // Ensure the client's session is fresh and we have a valid access token
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.error || !refreshed.data.session) {
+        return { ok: false, error: SESSION_EXPIRED_ERROR };
+      }
+
       const body = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
         reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
         reader.readAsDataURL(file);
       });
+
+      // Primary path: call the server function which validates the token server-side
       const result = await uploadReceiptToBlob({ data: { filename: file.name, contentType: file.type, body } });
-      if (!result.ok) return result;
-      return { ok: true, path: result.url };
+      if (!result.ok) {
+        if (isStaleSessionError(result.error)) {
+          await clearStaleSession();
+          return { ok: false, error: SESSION_EXPIRED_ERROR };
+        }
+        return { ok: false, error: result.error };
+      }
+
+      return { ok: true, path: result.url ?? result.pathname };
     }
 
+    // For blog uploads we follow the signed-url flow and need a valid session
     const refreshed = await supabase.auth.refreshSession();
     if (refreshed.error || !refreshed.data.session) {
       return { ok: false, error: "جلسه ورود معتبر نیست. ابتدا خارج شوید و دوباره وارد حساب شوید." };
